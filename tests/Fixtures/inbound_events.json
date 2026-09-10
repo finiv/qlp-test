@@ -1,0 +1,161 @@
+[
+  {
+    "event_id": "evt_01HZ8A0001",
+    "tenant_id": 42,
+    "sender": "d.walker@northshore-homes.ca",
+    "recipient": "campaign+c42@mg.ourdomain.com",
+    "body_plain": "Sounds good. Can you call me Thursday afternoon? I still have the quote.",
+    "headers": {
+      "Message-Id": "<20260901.1001@mail.northshore-homes.ca>",
+      "In-Reply-To": "<step2.c42@mg.ourdomain.com>",
+      "Auto-Submitted": "no"
+    },
+    "timestamp": 1756713600
+  },
+  {
+    "event_id": "evt_01HZ8A0002",
+    "tenant_id": 42,
+    "sender": "m.tremblay@lakesideprop.ca",
+    "recipient": "campaign+c42@mg.ourdomain.com",
+    "body_plain": "How much would it be for eight windows on the second floor?",
+    "headers": {
+      "Message-Id": "<20260901.1002@mail.lakesideprop.ca>",
+      "In-Reply-To": "<step1.c42@mg.ourdomain.com>",
+      "Auto-Submitted": "no"
+    },
+    "timestamp": 1756717200
+  },
+  {
+    "event_id": "evt_01HZ8A0003",
+    "tenant_id": 42,
+    "sender": "r.osei@maplecourt.ca",
+    "recipient": "campaign+c42@mg.ourdomain.com",
+    "body_plain": "Please take me off your list. I do not want any more emails about this.",
+    "headers": {
+      "Message-Id": "<20260901.1003@mail.maplecourt.ca>",
+      "In-Reply-To": "<step3.c42@mg.ourdomain.com>",
+      "Auto-Submitted": "no"
+    },
+    "timestamp": 1756720800
+  },
+  {
+    "event_id": "evt_01HZ8A0004",
+    "tenant_id": 42,
+    "sender": "j.kowalczyk@bridgeportbuild.ca",
+    "recipient": "campaign+c42@mg.ourdomain.com",
+    "body_plain": "I am out of the office until September 15 with limited access to email. For urgent matters please contact reception at 604-555-0142.",
+    "headers": {
+      "Message-Id": "<20260901.1004@mail.bridgeportbuild.ca>",
+      "In-Reply-To": "<step2.c42@mg.ourdomain.com>",
+      "Auto-Submitted": "auto-replied",
+      "X-Auto-Response-Suppress": "All"
+    },
+    "timestamp": 1756724400
+  },
+  {
+    "event_id": "evt_01HZ8A0005",
+    "tenant_id": 42,
+    "sender": "s.lindqvist@harbourview.ca",
+    "recipient": "campaign+c42@mg.ourdomain.com",
+    "body_plain": "Automatic reply: I am on parental leave until March. Your message has not been forwarded.",
+    "headers": {
+      "Message-Id": "<20260902.1005@mail.harbourview.ca>",
+      "In-Reply-To": "<step1.c42@mg.ourdomain.com>",
+      "Auto-Submitted": "auto-replied"
+    },
+    "timestamp": 1756800000
+  },
+  {
+    "event_id": "evt_01HZ8A0006",
+    "tenant_id": 42,
+    "sender": "a.ferreira@stonegate.ca",
+    "recipient": "campaign+c42@mg.ourdomain.com",
+    "body_plain": "Thank you for your message. Our office is closed for the long weekend and will reopen Tuesday.",
+    "headers": {
+      "Message-Id": "<20260902.1006@mail.stonegate.ca>",
+      "In-Reply-To": "<step2.c42@mg.ourdomain.com>",
+      "X-Autoreply": "yes",
+      "Precedence": "bulk"
+    },
+    "timestamp": 1756803600
+  },
+  {
+    "event_id": "evt_01HZ8A0007",
+    "tenant_id": 42,
+    "sender": "MAILER-DAEMON@mg.ourdomain.com",
+    "recipient": "campaign+c42@mg.ourdomain.com",
+    "body_plain": "This is the mail system at host mg.ourdomain.com. I'm sorry to have to inform you that your message could not be delivered. 550 5.1.1 <p.novak@cedarline.ca>: Recipient address rejected: User unknown in virtual mailbox table",
+    "headers": {
+      "Message-Id": "<20260902.1007@mg.ourdomain.com>",
+      "Content-Type": "multipart/report; report-type=delivery-status",
+      "Auto-Submitted": "auto-generated"
+    },
+    "timestamp": 1756807200
+  },
+  {
+    "event_id": "evt_01HZ8A0008",
+    "tenant_id": 42,
+    "sender": "l.beaulieu@ridgetop.ca",
+    "recipient": "campaign+c42@mg.ourdomain.com",
+    "body_plain": "",
+    "body_html": "<html><body><div>Not this year, our budget is spent. Try us again in the spring.</div></body></html>",
+    "headers": {
+      "Message-Id": "<20260903.1008@mail.ridgetop.ca>",
+      "In-Reply-To": "<step3.c42@mg.ourdomain.com>",
+      "Auto-Submitted": "no"
+    },
+    "timestamp": 1756890000
+  },
+  {
+    "event_id": "evt_01HZ8A0009",
+    "tenant_id": 42,
+    "sender": "campaign+c42@mg.ourdomain.com",
+    "recipient": "campaign+c42@mg.ourdomain.com",
+    "body_plain": "Hi there, just checking in on the quote we sent over.",
+    "headers": {
+      "Message-Id": "<20260903.1009@mg.ourdomain.com>",
+      "In-Reply-To": "<step2.c42@mg.ourdomain.com>",
+      "Auto-Submitted": "no"
+    },
+    "timestamp": 1756893600
+  },
+  {
+    "event_id": "evt_01HZ8A0001",
+    "tenant_id": 42,
+    "sender": "d.walker@northshore-homes.ca",
+    "recipient": "campaign+c42@mg.ourdomain.com",
+    "body_plain": "Sounds good. Can you call me Thursday afternoon? I still have the quote.",
+    "headers": {
+      "Message-Id": "<20260901.1001@mail.northshore-homes.ca>",
+      "In-Reply-To": "<step2.c42@mg.ourdomain.com>",
+      "Auto-Submitted": "no"
+    },
+    "timestamp": 1756713600
+  },
+  {
+    "event_id": "evt_01HZ8A0011",
+    "tenant_id": 43,
+    "sender": "d.walker@northshore-homes.ca",
+    "recipient": "campaign+c43@mg.ourdomain.com",
+    "body_plain": "Yes, we are interested. Who should I talk to about installation dates?",
+    "headers": {
+      "Message-Id": "<20260904.1011@mail.northshore-homes.ca>",
+      "In-Reply-To": "<step1.c43@mg.ourdomain.com>",
+      "Auto-Submitted": "no"
+    },
+    "timestamp": 1756980000
+  },
+  {
+    "event_id": "evt_01HZ8A0012",
+    "tenant_id": 42,
+    "sender": "k.mensah@fairlawn.ca",
+    "recipient": "campaign+c42@mg.ourdomain.com",
+    "body_plain": "Actually, could you send the brochure again? The link expired.",
+    "headers": {
+      "Message-Id": "<20260828.1012@mail.fairlawn.ca>",
+      "In-Reply-To": "<step1.c42@mg.ourdomain.com>",
+      "Auto-Submitted": "no"
+    },
+    "timestamp": 1756368000
+  }
+]
