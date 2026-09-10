@@ -77,4 +77,30 @@ class UnsubscribeRuleTest extends TestCase
     {
         $this->assertFalse(UnsubscribeRule::matches('How much would it be for eight windows on the second floor?'));
     }
+
+    public function test_the_fixtures_second_trap_does_not_match(): void
+    {
+        // evt_01HZ8A0008. The classifier returns a perfectly valid, in-rubric
+        // "unsubscribe" for this body -- a customer who only postponed. The rule
+        // must stay silent here: it is the deterministic half of the signal, and
+        // its silence is what tells a reviewer the suppression came from the
+        // model's guess alone rather than from anything the customer wrote.
+        $this->assertFalse(UnsubscribeRule::matches(
+            'Not this year, our budget is spent. Try us again in the spring.'
+        ));
+    }
+
+    public function test_trigger_word_below_an_on_wrote_line_is_ignored(): void
+    {
+        $this->assertFalse(UnsubscribeRule::matches(
+            "Sounds good, thanks.\nOn Sep 1, 2026, Sales <sales@example.ca> wrote:\n    Click here to unsubscribe."
+        ));
+    }
+
+    public function test_trigger_word_below_an_original_message_line_is_ignored(): void
+    {
+        $this->assertFalse(UnsubscribeRule::matches(
+            "Thanks for the quote.\n-----Original Message-----\nTo unsubscribe, follow this link."
+        ));
+    }
 }
