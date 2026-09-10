@@ -10,6 +10,4 @@ return [
     'timezone' => 'UTC',
     'locale'   => 'en',
     'faker_locale' => 'en_CA',
-
-    'providers' => [],
 ];
