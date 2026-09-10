@@ -321,4 +321,57 @@ class ProcessInboundReplyJobTest extends TestCase
             DB::table('processed_events')->where('event_id', '')->count()
         );
     }
+
+    /**
+     * Out-of-order delivery is a stated property of the bus, so the pipeline's
+     * two monotonicity guards have to be pinned down. Without this test,
+     * dropping ->whereNull('suppressed_at') from the job passes the whole
+     * suite: the flag stays set either way, and only the *date* silently moves
+     * to today. That date is the record of when consent was actually
+     * withdrawn -- the one field a compliance question would ask about.
+     */
+    public function test_an_earlier_opt_out_date_is_never_overwritten_by_a_later_reply(): void
+    {
+        $optedOutAt = now()->subDays(9)->startOfSecond();
+
+        $client = $this->seedActiveClient(42, 'k.mensah@fairlawn.ca');
+        $client->forceFill(['suppressed_at' => $optedOutAt])->save();
+
+        // A second, later reply that also reads as an opt-out.
+        ProcessInboundReplyJob::dispatchSync($this->fixturePayload('evt_01HZ8A0003', [
+            'event_id' => 'evt_later_optout',
+            'sender'   => 'k.mensah@fairlawn.ca',
+        ]));
+
+        $this->assertTrue(
+            $optedOutAt->equalTo($client->fresh()->suppressed_at),
+            'the original opt-out timestamp must survive a later reply',
+        );
+    }
+
+    /**
+     * The mirror guard: ->where('status', 'active') on the pause. A stopped
+     * enrollment is never touched again, so a late-arriving reply cannot
+     * rewrite the scheduling of a campaign that has already been ended.
+     */
+    public function test_a_stopped_enrollment_is_left_untouched_by_a_later_reply(): void
+    {
+        $client = $this->seedActiveClient(42, 'k.mensah@fairlawn.ca');
+
+        $sendAt = now()->addDays(3)->startOfSecond();
+        CampaignEnrollment::query()->where('client_id', $client->id)
+            ->update(['status' => 'stopped', 'next_send_at' => $sendAt]);
+
+        ProcessInboundReplyJob::dispatchSync($this->fixturePayload('evt_01HZ8A0002', [
+            'event_id' => 'evt_late_reply',
+            'sender'   => 'k.mensah@fairlawn.ca',
+        ]));
+
+        $enrollment = CampaignEnrollment::query()->where('client_id', $client->id)->sole();
+        $this->assertSame('stopped', $enrollment->status);
+        $this->assertTrue(
+            $sendAt->equalTo($enrollment->next_send_at),
+            'a stopped enrollment must not be rewritten by a later reply',
+        );
+    }
 }
