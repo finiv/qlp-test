@@ -45,13 +45,99 @@ class UnsubscribeRuleTest extends TestCase
         $this->assertTrue(UnsubscribeRule::matches('Please stop contacting me.'));
     }
 
-    public function test_known_limitation_negated_stop_emailing_is_a_false_positive(): void
+    public function test_negated_stop_emailing_no_longer_false_positives(): void
     {
-        // Known limitation, accepted on purpose: this sentence is a request
-        // to KEEP emailing, but "stop emailing" still matches as a substring.
-        // We do not add negation handling to "fix" it, because the sentence
-        // is not one people write in practice.
-        $this->assertTrue(UnsubscribeRule::matches("I don't want you to stop emailing me."));
+        // This used to be an accepted false positive (see git history): a
+        // request to KEEP emailing, flagged as opt-out purely because "stop
+        // emailing" appears as a substring. Once isNegated() exists at all to
+        // fix the "don't unsubscribe me" audit finding below, leaving this
+        // one case unfixed would be an arbitrary exception, not a decision.
+        $this->assertFalse(UnsubscribeRule::matches("I don't want you to stop emailing me."));
+    }
+
+    public function test_negated_unsubscribe_does_not_match(): void
+    {
+        // Audit finding: "don't unsubscribe me" contains the bare
+        // "unsubscribe" substring and used to match despite asking for the
+        // opposite.
+        $this->assertFalse(UnsubscribeRule::matches('Please do not unsubscribe me. I want your offers.'));
+        $this->assertFalse(UnsubscribeRule::matches("Don't unsubscribe me, I actually like these emails."));
+    }
+
+    public function test_negation_more_than_twenty_characters_before_the_pattern_still_matches(): void
+    {
+        // isNegated() only looks a short, fixed window back -- it is a
+        // safety-net heuristic, not a negation parser. A negation word far
+        // enough away that it plainly belongs to a different clause must not
+        // suppress a real match.
+        $this->assertTrue(UnsubscribeRule::matches(
+            "I don't have time to talk right now, but please just unsubscribe me."
+        ));
+    }
+
+    public function test_any_more_emails_matches_without_any_other_trigger_word(): void
+    {
+        // Audit finding: the fixture's real opt-out only matches because of
+        // "take me off" -- a customer who writes exactly this sentence and
+        // nothing else, combined with a classifier failure, previously
+        // produced no suppression signal at all.
+        $this->assertTrue(UnsubscribeRule::matches('I do not want any more emails.'));
+        $this->assertTrue(UnsubscribeRule::matches("I don't want any more emails."));
+    }
+
+    public function test_a_request_for_more_emails_does_not_match(): void
+    {
+        // Second-round audit finding: a bare "any more emails" pattern (an
+        // earlier version of this fix) matched this too -- a request for
+        // MORE contact, the opposite of an opt-out. The negation is now
+        // baked into the pattern itself for exactly this reason.
+        $this->assertFalse(UnsubscribeRule::matches('Can you send me any more emails about installation?'));
+    }
+
+    public function test_negated_unsubscribe_matches_with_a_curly_apostrophe(): void
+    {
+        // Second-round audit finding: NEGATIONS held only the straight
+        // apostrophe, so Outlook/Word's silent substitution of U+2019 (the
+        // same trap documented in the class docblock for a different
+        // pattern) meant this negation went undetected and the bare
+        // "unsubscribe" substring matched anyway.
+        $this->assertFalse(UnsubscribeRule::matches("Please don\u{2019}t unsubscribe me."));
+    }
+
+    public function test_negation_does_not_bleed_across_a_sentence_boundary(): void
+    {
+        // Second-round audit finding: the negation window looked back a
+        // fixed number of characters with no regard for sentence
+        // boundaries, so "don't" in an earlier, unrelated sentence
+        // cancelled a plain instruction in the next one.
+        $this->assertTrue(UnsubscribeRule::matches("I don't want these. Unsubscribe me."));
+    }
+
+    public function test_known_limitation_a_valid_classifier_label_is_not_vetoed_by_this_rule(): void
+    {
+        // FakeFlakyClassifier::guess() does its own bare str_contains() for
+        // 'unsubscribe' with no negation awareness of its own, independently
+        // of this rule. This rule only ever ADDS a suppression signal on top
+        // of the classifier's label, never subtracts one -- so a valid,
+        // in-rubric "unsubscribe" the classifier itself misread from a
+        // negated sentence is not caught here. See the class docblock.
+        $this->assertFalse(UnsubscribeRule::matches("Don't unsubscribe me, I like these emails."));
+    }
+
+    public function test_outlook_style_quote_header_is_stripped(): void
+    {
+        // Audit finding: stripQuotedHistory() recognised ">", "On ... wrote:"
+        // and "-----Original Message-----", but not Outlook's own
+        // "From:/Sent:/To:/Subject:" quote block, so a quoted "unsubscribe"
+        // in that format still matched.
+        $body = "Thanks, we're good for now.\n\n"
+            . "From: Sales Team\n"
+            . "Sent: Tuesday, September 1, 2026 10:00 AM\n"
+            . "To: Customer\n"
+            . "Subject: Reminder\n\n"
+            . 'If you want to unsubscribe, click here.';
+
+        $this->assertFalse(UnsubscribeRule::matches($body));
     }
 
     // --- A little extra breadth over the pattern list ---------------------

@@ -228,6 +228,103 @@ class ProcessInboundReplyJobTest extends TestCase
         $this->assertSame(1, DB::table('processed_events')->count());
     }
 
+    /**
+     * Audit finding: Step 6 (pause every active enrollment) ran unconditionally,
+     * before the idempotency claim check. A stale at-least-once redelivery of an
+     * event that finished processing long ago -- for a client since re-enrolled
+     * in a brand new campaign -- would pause that new, unrelated campaign too.
+     * The task-level dedup (asserted below) was never the problem; the campaign
+     * side effect escaping it was.
+     */
+    public function test_a_duplicate_of_an_already_processed_event_does_not_touch_a_newer_enrollment(): void
+    {
+        $client = $this->seedActiveClient(42, 'd.walker@northshore-homes.ca');
+        $originalEnrollment = $client->enrollments()->first();
+
+        $payload = $this->fixturePayload('evt_01HZ8A0001');
+
+        ProcessInboundReplyJob::dispatchSync($payload);
+
+        $originalEnrollment->refresh();
+        $this->assertSame('stopped', $originalEnrollment->status);
+
+        // Re-enrolled in a brand new campaign, weeks later.
+        $newEnrollment = CampaignEnrollment::factory()->create([
+            'tenant_id'   => 42,
+            'client_id'   => $client->id,
+            'campaign_id' => 99,
+            'status'      => 'active',
+        ]);
+
+        // The bus redelivers the same, already-claimed event -- at-least-once.
+        ProcessInboundReplyJob::dispatchSync($payload);
+
+        $this->assertSame(1, ReplyTask::count());
+
+        $newEnrollment->refresh();
+        $this->assertSame(
+            'active',
+            $newEnrollment->status,
+            'a stale duplicate of an old reply must not pause a campaign the client was enrolled into afterwards',
+        );
+    }
+
+    /**
+     * Audit finding: the classifier received the raw, un-stripped body, so a
+     * quoted marketing footer containing "unsubscribe" -- which UnsubscribeRule
+     * correctly ignores -- could still flip the model's own answer. Asserted by
+     * mock expectation rather than by picking a FakeFlakyClassifier crc32
+     * bucket: if the raw body ever reaches the classifier again, Mockery fails
+     * this test outright on the ->with() mismatch.
+     */
+    public function test_the_classifier_receives_the_body_with_quoted_history_stripped(): void
+    {
+        $body = "Yes, please call me.\n> To unsubscribe click here.";
+
+        $this->mock(SentimentClassifier::class)
+            ->shouldReceive('classify')
+            ->once()
+            ->with('Yes, please call me.')
+            ->andReturn('{"sentiment": "interested"}');
+
+        $client = $this->seedActiveClient(42, 'd.walker@northshore-homes.ca');
+
+        ProcessInboundReplyJob::dispatchSync($this->fixturePayload('evt_01HZ8A0001', [
+            'body_plain' => $body,
+        ]));
+
+        $task = ReplyTask::sole();
+        $this->assertSame('interested', $task->sentiment);
+        // The full body, quote included, is still what the manager sees.
+        $this->assertSame($body, $task->body);
+        $this->assertNull($client->fresh()->suppressed_at);
+    }
+
+    /**
+     * Audit finding: "I do not want any more emails." alone (no "take me
+     * off", no other pattern) combined with a classifier failure produced no
+     * suppression signal at all -- closed by adding "any more emails" to
+     * UnsubscribeRule's pattern list (see UnsubscribeRuleTest for the
+     * rule-level case; this pins the same finding through the full job).
+     */
+    public function test_opt_out_without_a_keyword_still_suppresses_when_the_classifier_times_out(): void
+    {
+        $this->mock(SentimentClassifier::class)
+            ->shouldReceive('classify')
+            ->andThrow(new ClassifierTimeoutException());
+
+        $client = $this->seedActiveClient(42, 'd.walker@northshore-homes.ca');
+
+        ProcessInboundReplyJob::dispatchSync($this->fixturePayload('evt_01HZ8A0001', [
+            'body_plain' => 'I do not want any more emails.',
+        ]));
+
+        $task = ReplyTask::sole();
+        $this->assertSame('unsubscribe', $task->sentiment);
+
+        $this->assertNotNull($client->fresh()->suppressed_at);
+    }
+
     public function test_tenants_do_not_leak(): void
     {
         $client42 = $this->seedActiveClient(42, 'd.walker@northshore-homes.ca');

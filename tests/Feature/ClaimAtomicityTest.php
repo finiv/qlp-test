@@ -64,7 +64,8 @@ class ClaimAtomicityTest extends TestCase
 
     public function test_a_failure_while_writing_the_task_rolls_back_the_claim(): void
     {
-        $this->seedActiveClient(42, 'm.tremblay@lakesideprop.ca');
+        $client = $this->seedActiveClient(42, 'm.tremblay@lakesideprop.ca');
+        $enrollment = $client->enrollments()->first();
 
         ReplyTask::creating(function (): void {
             throw new RuntimeException('boom');
@@ -79,14 +80,24 @@ class ClaimAtomicityTest extends TestCase
             $this->assertSame('boom', $e->getMessage());
         }
 
-        // The claim (processed_events insert) and the ReplyTask write happen
-        // inside the same DB transaction specifically so a failure here rolls
-        // both back together. If the claim alone had survived, the event
-        // would be marked processed forever with no task ever created for
-        // it -- the customer's reply would be lost silently, with nothing
-        // left afterward to show it ever arrived.
+        // The claim (processed_events insert), the campaign pause, and the
+        // ReplyTask write all happen inside the same DB transaction
+        // specifically so a failure anywhere in that sequence rolls
+        // everything back together. If the claim alone had survived, the
+        // event would be marked processed forever with no task ever created
+        // for it -- the customer's reply would be lost silently, with
+        // nothing left afterward to show it ever arrived.
         $this->assertSame(0, DB::table('processed_events')->count());
         $this->assertSame(0, ReplyTask::count());
+
+        // The pause is part of the same transaction now too (an audit found
+        // that an earlier version committed the claim on its own, which left
+        // it unrecoverable if the *worker process itself* died before
+        // finishing -- a thrown exception was never the only way to fail
+        // mid-pipeline). A failed write must not leave the campaign paused
+        // for an event that, as far as the database is concerned, never
+        // happened.
+        $this->assertSame('active', $enrollment->fresh()->status);
     }
 
     public function test_a_job_whose_claim_is_already_taken_writes_nothing(): void
