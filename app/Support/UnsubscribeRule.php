@@ -44,28 +44,24 @@ namespace App\Support;
  * itself, not bolted on afterwards, because "any more emails" alone carries
  * no polarity of its own.
  *
- * Negation handling (isNegated()) was added for the same audit: "don't
- * unsubscribe me" and "please do not unsubscribe" both contain the bare
- * "unsubscribe" substring and used to match anyway. It only looks a short,
- * fixed window immediately before the match, cut off at the nearest
- * preceding sentence boundary (., !, ?, newline) so a negation from an
- * earlier, unrelated sentence ("I don't want these. Unsubscribe me.")
- * can't cancel a plain instruction in the current one. This is a
- * safety-net heuristic, not a negation parser, and does not try to be one.
- * It deliberately also flips the one negation case this class used to
- * accept on purpose ("I don't want you to stop emailing me" — see the test
- * for that string): once we're checking for negation at all, silently
- * ignoring one instance of it would be an arbitrary exception, not a
- * design decision.
+ * Negation handling was tried and reverted. A bounded look-behind for
+ * "don't" / "do not" / "won't" / "will not" removed the false positive on
+ * "I don't want you to stop emailing me" -- and silently un-matched six of
+ * seven short, constructed opt-outs of the form "Don't need it,
+ * unsubscribe." or "I don't think so, take me off the list." Those are the
+ * two error directions this rule can have, and they are not symmetric: a
+ * false positive suppresses someone who then shows up on a manager's card
+ * with the letter beside the label, and a human undoes it; a false negative
+ * on an explicit refusal means the next campaign step goes to someone who
+ * asked us to stop, and nobody sees it. So the rule stays a plain substring
+ * match and accepts the false positive on negated phrasing as a known
+ * limitation. This is a chosen priority, not error-free detection.
  *
- * Known, accepted gap: this rule only ever *adds* a suppression signal on
- * top of the classifier's own label, never subtracts one. If the
- * classifier itself (real or fake) returns a valid, in-rubric
- * "unsubscribe" for a negated sentence it misread, this rule does not
- * veto it. Teaching the rule to override a model's own answer would trade
- * one class of false positive for another (a keyword match overruling a
- * genuinely correct classification elsewhere in a longer message), so
- * that trade was not made here.
+ * The rule only ever *adds* a suppression signal on top of the
+ * classifier's own label, never subtracts one. If the classifier returns a
+ * valid, in-rubric "unsubscribe" for a sentence it misread, this rule does
+ * not veto it: teaching a keyword match to overrule a model's answer would
+ * trade one class of false positive for another.
  */
 class UnsubscribeRule
 {
@@ -80,47 +76,14 @@ class UnsubscribeRule
         'do not want any more emails',
     ];
 
-    /**
-     * Negation words/phrases that, found immediately before a matched
-     * pattern (and within the same sentence), flip a match to a non-match.
-     * Kept as short and literal as the pattern list itself.
-     */
-    private const NEGATIONS = [
-        "don't",
-        'do not',
-        "won't",
-        'will not',
-    ];
-
-    /**
-     * How many characters before a pattern match to scan for a negation
-     * word. Long enough to catch "please do not unsubscribe" (14 chars of
-     * lead-in), short enough that it won't reach back across an unrelated
-     * earlier clause in the same sentence -- and further capped at the
-     * nearest sentence boundary regardless (see isNegated()).
-     */
-    private const NEGATION_WINDOW = 20;
-
-    /**
-     * Marks the end of a sentence for the purpose of bounding the negation
-     * window. Not used to strip anything -- only to stop isNegated() from
-     * looking past it.
-     */
-    private const SENTENCE_BOUNDARIES = ['.', '!', '?', "\n"];
 
     public static function matches(string $body): bool
     {
         $haystack = self::normalize(self::stripQuotedHistory($body));
 
         foreach (self::PATTERNS as $pattern) {
-            $offset = 0;
-
-            while (($pos = mb_strpos($haystack, $pattern, $offset)) !== false) {
-                if (!self::isNegated($haystack, $pos)) {
-                    return true;
-                }
-
-                $offset = $pos + 1;
+            if (str_contains($haystack, $pattern)) {
+                return true;
             }
         }
 
@@ -129,40 +92,15 @@ class UnsubscribeRule
 
     /**
      * Lowercases and normalises the curly apostrophe (U+2019) that
-     * Outlook/Word silently substitute for a typed straight one, so
-     * NEGATIONS' straight-apostrophe entries ("don't") still match text
-     * that never had a straight apostrophe in it to begin with.
+     * Outlook/Word silently substitute for a typed straight one, so the
+     * "don't want any more emails" pattern still matches text that never
+     * had a straight apostrophe in it to begin with.
      */
     private static function normalize(string $text): string
     {
         return str_replace("\u{2019}", "'", mb_strtolower($text));
     }
 
-    private static function isNegated(string $haystack, int $matchPos): bool
-    {
-        $start = max(0, $matchPos - self::NEGATION_WINDOW);
-        $window = mb_substr($haystack, $start, $matchPos - $start);
-
-        $boundary = null;
-        foreach (self::SENTENCE_BOUNDARIES as $marker) {
-            $pos = mb_strrpos($window, $marker);
-            if ($pos !== false && ($boundary === null || $pos > $boundary)) {
-                $boundary = $pos;
-            }
-        }
-
-        if ($boundary !== null) {
-            $window = mb_substr($window, $boundary + 1);
-        }
-
-        foreach (self::NEGATIONS as $negation) {
-            if (str_contains($window, $negation)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 
     /**
      * Truncates the body at the first line that looks like the start of

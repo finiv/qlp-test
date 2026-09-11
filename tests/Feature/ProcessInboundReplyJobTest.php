@@ -325,6 +325,29 @@ class ProcessInboundReplyJobTest extends TestCase
         $this->assertNotNull($client->fresh()->suppressed_at);
     }
 
+    public function test_a_terse_refusal_is_honoured_when_the_classifier_times_out(): void
+    {
+        // The rule is the only signal here: the model is down. "Don't need
+        // it, unsubscribe." is one of seven constructed short refusals that
+        // a negation look-behind, tried in an earlier commit, silently
+        // un-matched. With the model out and the rule blind, this customer
+        // would have received the next campaign step. Pinned end to end.
+        $this->mock(SentimentClassifier::class)
+            ->shouldReceive('classify')
+            ->andThrow(new ClassifierTimeoutException());
+
+        $client = $this->seedActiveClient(42, 'd.walker@northshore-homes.ca');
+
+        ProcessInboundReplyJob::dispatchSync($this->fixturePayload('evt_01HZ8A0001', [
+            'body_plain' => "Don't need it, unsubscribe.",
+        ]));
+
+        $task = ReplyTask::sole();
+        $this->assertSame('unsubscribe', $task->sentiment);
+        $this->assertNotNull($client->fresh()->suppressed_at);
+        $this->assertSame('stopped', CampaignEnrollment::query()->where('client_id', $client->id)->sole()->status);
+    }
+
     public function test_tenants_do_not_leak(): void
     {
         $client42 = $this->seedActiveClient(42, 'd.walker@northshore-homes.ca');
